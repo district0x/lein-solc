@@ -10,7 +10,7 @@
   (let [{:keys [exit out err]} (apply sh/sh args)
         out (string/trim-newline out)]
     (when-not (zero? exit)
-      (lein/warn (format "Command failed with result %s %s" err out)))
+      (lein/warn (format "Command failed with the following result: \n %s %s" err out)))
     (when-not (string/blank? out)
       (lein/info out))
     out))
@@ -23,19 +23,18 @@
 (defn start-watcher
   [path]
   (let [channel (async/chan)]
-    (future (watch/start-watch
-             [{:path path
-               :event-types [:modify]
-               :bootstrap (fn [p] (lein/info (str "Watching " p " for file changes ...")))
-               :callback (fn [_ file] (async/put! channel file))
-               :options {:recursive true}}]))
+    (watch/start-watch
+     [{:path path
+       :event-types [:modify]
+       :bootstrap (fn [p] (lein/info (format "- Watching %s for file changes ..." p)))
+       :callback (fn [_ file] (async/put! channel file))
+       :options {:recursive true}}])
     channel))
 
-(defn compile-contract [filename src-path build-path]
-  (sh! "solc" "--overwrite" "--optimize" "--bin" "--abi" (str src-path filename) "-o" build-path))
+(defn compile-contract [filename src-path build-dir]
+  (sh/with-sh-dir src-path
+    (sh! "solc" "--overwrite" "--optimize" "--bin" "--abi" filename "-o" build-dir)))
 
-;; TODO : solc-error-only
-;; solc "$@" 2>&1 | grep -A 2 -i "Error"
 (defn solc
   "Lein plugin for compiling solidity contracts.
   Usage:
@@ -43,19 +42,20 @@
   [project & [args]]
   (let [{:keys [src-path build-path contracts solc-err-only] :as opts} (:solc project)
         contracts-set (set contracts)
-        safe-src-path (ensure-slash src-path)
-        safe-build-path (ensure-slash build-path)
+        build-dir (-> (.getCanonicalPath (clojure.java.io/file "."))
+                      ensure-slash
+                      (str build-path))
         once (fn [] (doseq [c contracts]
-                      (compile-contract c safe-src-path safe-build-path)))
+                      (compile-contract c src-path build-dir)))
         auto (fn [] (let [watcher (start-watcher src-path)]
                       (while true
                         (let [filename (-> (<!! watcher)
                                            (string/split #"/")
                                            last)]
                           (if (contains? contracts-set filename)
-                            (do (lein/info (str filename " has changed"))
-                                (compile-contract filename safe-src-path safe-build-path))
-                            (lein/info (str "Ignoring changes in " filename)))))))]
+                            (do (lein/info (format "%s has changed" filename))
+                                (compile-contract filename src-path build-dir))
+                            (lein/info (format "Ignoring changes in %s" filename)))))))]
     (cond
       (not opts)
       (lein/abort "No `:solc` options map found in project.clj")
@@ -64,6 +64,7 @@
       (once)
 
       (= "auto" args)
-      (auto)
+      (do (once)
+          (auto))
 
       :default (once))))
