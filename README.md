@@ -17,8 +17,9 @@ You can specify the contracts to compile by adding an `:solc` map to your projec
 It takes the following key value pairs:
 * `:src-path` string with the path where the *.sol* source files are residing, relative to the projects root path.
 * `:build-path` string with the path where the compiled binaries and ABI Json files are written to, relative to the projects root directory.
-* `:contracts` vector of files with the Solidity contracts source code, relative to the **src-path** directory. You can also specify sub-directories.
+* `:contracts` vector of files with the Solidity contracts source code, relative to the **src-path** directory, you can also specify sub-directories or `:all` to compile all the contracts in the root of the **src-path**.
 * `:solc-err-only` boolean, if `true` only compilation errors will be reported to the **STDOUT**.
+* `:verbose` (optional) boolean, if `false` the **STDOUT** output is limited to the most important information.
 * `:wc` boolean, if `true` after succesfull compilation the number of characters of the compiled bin file will be printed to the **STDOUT**.
 
 Example:
