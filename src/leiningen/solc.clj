@@ -5,12 +5,14 @@
             [clojure.string :as string]
             [leiningen.core.main :as lein]))
 
-(defn sh! [& args]
+(defn sh! [{:keys [err-only] :as opts} & args]
   (lein/info (format "* Running shell command \"%s\"" (string/join " " args)))
   (let [{:keys [exit out err]} (apply sh/sh args)
         out (string/trim-newline out)]
-    (when-not (zero? exit)
-      (lein/warn (format "Command failed with the following result: \n %s %s" err out)))
+    (when-not (and (zero? exit) err-only)
+      (lein/warn (format "Command %s with the following result: \n %s" (if (zero? exit)
+                                                                         "exited"
+                                                                         "failed") err)))
     (when-not (string/blank? out)
       (lein/info out))
     out))
@@ -23,17 +25,17 @@
 (defn start-watcher
   [path]
   (let [channel (async/chan)]
-    (watch/start-watch
-     [{:path path
-       :event-types [:modify]
-       :bootstrap (fn [p] (lein/info (format "- Watching %s for file changes ..." p)))
-       :callback (fn [_ file] (async/put! channel file))
-       :options {:recursive true}}])
+    (future (watch/start-watch
+             [{:path path
+               :event-types [:modify]
+               :bootstrap (fn [p] (lein/info (format "- Watching %s for file changes ..." p)))
+               :callback (fn [_ file] (async/put! channel file))
+               :options {:recursive true}}]))
     channel))
 
-(defn compile-contract [filename src-path build-dir]
+(defn compile-contract [{:keys [filename src-path build-path solc-err-only]}]
   (sh/with-sh-dir src-path
-    (sh! "solc" "--overwrite" "--optimize" "--bin" "--abi" filename "-o" build-dir)))
+    (sh! {:err-only solc-err-only} "solc" "--overwrite" "--optimize" "--bin" "--abi" filename "-o" build-path)))
 
 (defn solc
   "Lein plugin for compiling solidity contracts.
@@ -45,17 +47,23 @@
                                 (assoc m (str (ensure-slash src-path) c) c))
                               {}
                               contracts)
-        full-build-dir (-> (.getCanonicalPath (clojure.java.io/file "."))
-                           ensure-slash
-                           (str build-path))
+        full-build-path (-> (.getCanonicalPath (clojure.java.io/file "."))
+                            ensure-slash
+                            (str build-path))
         once (fn [] (doseq [c contracts]
-                      (compile-contract c src-path full-build-dir)))
+                      (compile-contract {:filename c
+                                         :src-path src-path
+                                         :build-path full-build-path
+                                         :solc-err-only solc-err-only})))
         auto (fn [] (let [watcher (start-watcher src-path)]
                       (while true
                         (let [filename (<!! watcher)]
                           (if (contains? (-> contracts-map keys set) filename)
                             (do (lein/info (format "%s has changed" filename))
-                                (compile-contract (get contracts-map filename) src-path full-build-dir))
+                                (compile-contract {:filename (get contracts-map filename)
+                                                   :src-path src-path
+                                                   :build-path full-build-path
+                                                   :solc-err-only solc-err-only}))
                             (lein/info (format "Ignoring changes in %s" filename)))))))]
     (cond
       (not opts)

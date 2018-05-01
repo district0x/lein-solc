@@ -18,13 +18,15 @@ It takes the following key value pairs:
 * `:src-path` string with the path where the *.sol* source files are residing, relative to the projects root path.
 * `:build-path` string with the path where the compiled binaries and ABI Json files are written to, relative to the projects root directory.
 * `:contracts` vector of files with the Solidity contracts source code, relative to the **src-path** directory. You can also specify sub-directories.
+* `:solc-err-only` boolean, if `true` only compilation errors will be reported to **STDOUT**.
 
 Example:
 
 ```clojure
 :solc {:src-path "resources/contracts/src"
        :build-path "resources/contracts/build/"
-       :contracts ["MyContract.sol" "sub/MySecondContract.sol"]}
+       :contracts ["MyContract.sol" "sub/MySecondContract.sol"]
+       :solc-err-only true}
 ```
 
 The contracts in `:contracts` will be compiled when you do:
