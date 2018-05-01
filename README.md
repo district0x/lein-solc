@@ -18,7 +18,8 @@ It takes the following key value pairs:
 * `:src-path` string with the path where the *.sol* source files are residing, relative to the projects root path.
 * `:build-path` string with the path where the compiled binaries and ABI Json files are written to, relative to the projects root directory.
 * `:contracts` vector of files with the Solidity contracts source code, relative to the **src-path** directory. You can also specify sub-directories.
-* `:solc-err-only` boolean, if `true` only compilation errors will be reported to **STDOUT**.
+* `:solc-err-only` boolean, if `true` only compilation errors will be reported to the **STDOUT**.
+* `:wc` boolean, if `true` after succesfull compilation the number of characters of the compiled bin file be printed to the **STDOUT**.
 
 Example:
 
@@ -26,7 +27,8 @@ Example:
 :solc {:src-path "resources/contracts/src"
        :build-path "resources/contracts/build/"
        :contracts ["MyContract.sol" "sub/MySecondContract.sol"]
-       :solc-err-only true}
+       :solc-err-only true
+       :wc true}
 ```
 
 The contracts in `:contracts` will be compiled when you do:
