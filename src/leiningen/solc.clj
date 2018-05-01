@@ -45,17 +45,17 @@
                                 (assoc m (str (ensure-slash src-path) c) c))
                               {}
                               contracts)
-        build-dir (-> (.getCanonicalPath (clojure.java.io/file "."))
-                      ensure-slash
-                      (str build-path))
+        full-build-dir (-> (.getCanonicalPath (clojure.java.io/file "."))
+                           ensure-slash
+                           (str build-path))
         once (fn [] (doseq [c contracts]
-                      (compile-contract c src-path build-dir)))
+                      (compile-contract c src-path full-build-dir)))
         auto (fn [] (let [watcher (start-watcher src-path)]
                       (while true
                         (let [filename (<!! watcher)]
                           (if (contains? (-> contracts-map keys set) filename)
                             (do (lein/info (format "%s has changed" filename))
-                                (compile-contract (get contracts-map filename) src-path build-dir))
+                                (compile-contract (get contracts-map filename) src-path full-build-dir))
                             (lein/info (format "Ignoring changes in %s" filename)))))))]
     (cond
       (not opts)

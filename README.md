@@ -1,25 +1,40 @@
 # lein-solc
 
-A Leiningen plugin to do many wonderful things.
+A Leiningen plugin for compiling [Solidity](https://solidity.readthedocs.io/) smart contracts.
+
+## Installation
+
+Add to `:plugins` vector of your project.clj:
+
+```clojure
+:plugins [[lein-solc "1.0.0"]]
+```
+Plugin assumes [**solc** compiler](http://solidity.readthedocs.io/en/v0.4.21/installing-solidity.html) is installed and on your `$PATH`.
 
 ## Usage
 
-FIXME: Use this for user-level plugins:
+You can specify the contracts to compile by adding an `:solc` map to your project.clj.
+It takes the following key value pairs:
+* `:src-path` string with the path where the *.sol* source files are residing, relative to the projects root path.
+* `:build-path` string with the path where the compiled binaries and ABI Json files are written to, relative to the projects root directory.
+* `:contracts` vector of files with the Solidity contracts source code, relative to the **src-path** directory. You can also specify sub-directories.
 
-Put `[lein-solc "0.1.0-SNAPSHOT"]` into the `:plugins` vector of your `:user`
-profile.
+Example:
 
-FIXME: Use this for project-level plugins:
+```clojure
+:solc {:src-path "resources/contracts/src"
+       :build-path "resources/contracts/build/"
+       :contracts ["MyContract.sol" "sub/MySecondContract.sol"]}
+```
 
-Put `[lein-solc "0.1.0-SNAPSHOT"]` into the `:plugins` vector of your project.clj.
+The contracts in `:contracts` will be compiled when you do:
 
-FIXME: and add an example usage that actually makes sense:
+```bash
+$ lein solc once
+```
 
-    $ lein solc
+which is equivalent to `lein solc`. You can also watch the `:contracts` files and re-compile them on changes if you do:
 
-## License
-
-Copyright © 2018 FIXME
-
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+```bash
+$ lein solc auto
+```
