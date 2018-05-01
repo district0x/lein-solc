@@ -41,7 +41,10 @@
   `lein solc once` or `lein solc auto`"
   [project & [args]]
   (let [{:keys [src-path build-path contracts solc-err-only] :as opts} (:solc project)
-        contracts-set (set contracts)
+        contracts-map (reduce (fn [m c]
+                                (assoc m (str (ensure-slash src-path) c) c))
+                              {}
+                              contracts)
         build-dir (-> (.getCanonicalPath (clojure.java.io/file "."))
                       ensure-slash
                       (str build-path))
@@ -49,12 +52,10 @@
                       (compile-contract c src-path build-dir)))
         auto (fn [] (let [watcher (start-watcher src-path)]
                       (while true
-                        (let [filename (-> (<!! watcher)
-                                           (string/split #"/")
-                                           last)]
-                          (if (contains? contracts-set filename)
+                        (let [filename (<!! watcher)]
+                          (if (contains? (-> contracts-map keys set) filename)
                             (do (lein/info (format "%s has changed" filename))
-                                (compile-contract filename src-path build-dir))
+                                (compile-contract (get contracts-map filename) src-path build-dir))
                             (lein/info (format "Ignoring changes in %s" filename)))))))]
     (cond
       (not opts)
