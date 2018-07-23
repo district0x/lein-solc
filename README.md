@@ -7,7 +7,7 @@ A Leiningen plugin for compiling [Solidity](https://solidity.readthedocs.io/) sm
 Add to `:plugins` vector of your project.clj:
 
 ```clojure
-:plugins [[lein-solc "1.0.0"]]
+:plugins [[lein-solc "1.0.1"]]
 ```
 Plugin assumes [**solc** compiler](http://solidity.readthedocs.io/en/v0.4.21/installing-solidity.html) is installed and on your `$PATH`.
 
