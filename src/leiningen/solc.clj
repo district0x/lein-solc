@@ -73,7 +73,9 @@
   Usage:
   `lein solc once` or `lein solc auto`"
   [project & [args]]
-  (let [{:keys [src-path build-path contracts solc-err-only verbose wc] :as opts} (:solc project)
+  (let [{:keys [src-path build-path contracts solc-err-only verbose wc]
+         :or {solc-err-only true verbose false}
+         :as opts} (:solc project)
         contracts-map (cond (sequential? contracts)
                             (reduce (fn [m c]
                                       (assoc m (str (ensure-slash src-path) c) c))
