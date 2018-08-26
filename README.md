@@ -7,7 +7,7 @@ A Leiningen plugin for compiling [Solidity](https://solidity.readthedocs.io/) sm
 Add to `:plugins` vector of your project.clj:
 
 ```clojure
-:plugins [[lein-solc "1.0.1"]]
+:plugins [[lein-solc "1.0.1-1"]]
 ```
 Plugin assumes [**solc** compiler](http://solidity.readthedocs.io/en/v0.4.21/installing-solidity.html) is installed and on your `$PATH`.
 
@@ -18,8 +18,8 @@ It takes the following key value pairs:
 * `:src-path` string with the path where the *.sol* source files are residing, relative to the projects root path.
 * `:build-path` string with the path where the compiled binaries and ABI Json files are written to, relative to the projects root directory.
 * `:contracts` vector of files with the Solidity contracts source code, relative to the **src-path** directory, you can also specify sub-directories or `:all` to compile all the contracts in the root of the **src-path**.
-* `:solc-err-only` boolean, if `true` only compilation errors will be reported to the **STDOUT**.
-* `:verbose` (optional) boolean, if `false` the **STDOUT** output is limited to the most important information.
+* `:solc-err-only` (optional) boolean, if `true` (default value) only compilation errors will be reported to the **STDOUT**.
+* `:verbose` (optional) boolean, if `false` (default value) the **STDOUT** output is limited to the most important information.
 * `:wc` boolean, if `true` after succesfull compilation the number of characters of the compiled bin file will be printed to the **STDOUT**.
 
 Example:
