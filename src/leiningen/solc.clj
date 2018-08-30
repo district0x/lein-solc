@@ -1,11 +1,16 @@
 (ns leiningen.solc
-  (:require [clojure-watch.core :as watch]
-            [clojure.core.async :as async :refer [<!!]]
-            [clojure.core.match :refer [match]]
-            [clojure.java.shell :as sh]
-            [clojure.java.io :as io]
-            [clojure.string :as string]
-            [leiningen.core.main :as lein]))
+  (:require
+
+   [clojure-watch.core :as watch]
+   [clojure.core.async :as async :refer [<!!]]
+   [clojure.core.match :refer [match]]
+   [clojure.java.io :as io]
+   [clojure.java.shell :as sh]
+   [clojure.string :as string]
+   [leiningen.core.main :as lein]
+   [shim.matches :as matches]
+
+   ))
 
 (defn sh! [{:keys [err-only? verbose?] :as opts} & args]
   (when verbose?
@@ -50,8 +55,18 @@
                :options {:recursive true}}]))
     channel))
 
+
+;; TODO: shim file in tmp dir before compiling
 (defn compile-contract [{:keys [filename src-path build-path solc-err-only verbose wc]}]
-  (sh/with-sh-dir src-path
+
+  (let [file-path (str (ensure-slash src-path) filename)]
+    (-> file-path
+        slurp
+        matches/parse
+        clojure.pprint/pprint))
+
+
+  #_(sh/with-sh-dir src-path
     (let [exit-status (sh! {:err-only? solc-err-only :verbose? verbose} "solc" "--overwrite" "--optimize" "--bin" "--abi" filename "-o" build-path)]
       (when (and (zero? exit-status) wc)
         (sh! {:err-only? nil :verbose? verbose} "wc" "-c" (str (ensure-slash build-path)

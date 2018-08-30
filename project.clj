@@ -5,5 +5,7 @@
             :url "http://www.wtfpl.net/"}
   :dependencies [[org.clojure/core.async "0.4.474"]
                  [org.clojure/core.match "0.3.0-alpha5"]
+                 [clj-antlr "0.2.4"]
                  [clojure-watch "0.1.14"]]
-  :eval-in-leiningen true)
+  :eval-in-leiningen true
+  :resource-paths ["resources"])
