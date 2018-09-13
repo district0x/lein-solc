@@ -8,5 +8,5 @@
                  [clojure-future-spec "1.9.0-beta4"]
                  [clj-antlr "0.2.4"]
                  [clojure-watch "0.1.14"]]
-  :eval-in-leiningen true
-  :resource-paths ["resources"])
+  ;; :eval-in-leiningen true
+  )

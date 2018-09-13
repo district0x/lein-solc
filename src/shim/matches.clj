@@ -8,8 +8,6 @@
    [clj-antlr.core :as antlr]
    ))
 
-(def wildcard "_")
-
 (def ast `(:expression
            (:expression (:primaryExpression (:identifier "matches")))
            "("
@@ -133,26 +131,27 @@
 (s/def ::primary-expression #{:primaryExpression})
 (s/def ::identifier #{:identifier})
 (s/def ::tuple-expression #{:tupleExpression})
-(s/def ::square-bracket-left #{"["})
-(s/def ::square-bracket-right #{"]"})
-(s/def ::comma #{","})
-;; (s/def ::wildcard #{"_"})
+;; (s/def ::square-bracket-left #{"["})
+;; (s/def ::square-bracket-right #{"]"})
+;; (s/def ::comma #{","})
+(def wildcard "_")
+(s/def ::wildcard (s/cat :val ::identifier
+                         :head #{wildcard}))
+(s/def ::boolean #{"false" "true"})
 
 (s/def ::column
   (s/spec (s/cat :val ::expression
                  :next (s/spec (s/cat :val ::primary-expression
-                                      :next (s/spec (s/cat :val ::identifier
-                                                           :head (s/and string? #(not (= wildcard %))))))))))
+                                      :root (s/spec (s/cat :val ::identifier
+                                                           :head #(and (string? %)
+                                                                   (not (= % wildcard))))))))))
 
-;; (s/def ::pattern
-;;   (s/spec (s/cat :val ::expression
-;;                  :next (s/spec (s/cat :val ::primary-expression
-;;                                       :next (s/spec (s/cat :val ::identifier
-;;                                                            :head (s/and string? #(not (= wildcard %))))))))))
+(s/def ::pattern
+  (s/spec (s/cat :val ::expression
+                 :next (s/spec (s/cat :val ::primary-expression
+                                      :root (s/or :boolean ::boolean
+                                                  :wildcard ::wildcard))))))
 
-(s/valid? ::pattern `(:expression (:primaryExpression (:identifier "_"))))
-
-(s/valid? ::pattern `(:expression (:primaryExpression "false")))
 
 (s/def ::column-tuple (s/conformer (fn [expr]
                                      (cond
@@ -168,6 +167,28 @@
 
                                        :else ::s/invalid))))
 
+(s/def ::pattern-tuple (s/conformer (fn [exprs]
+                                      (cond
+                                        (not (seq? exprs))
+                                        ::s/invalid
+
+                                        (->> exprs first (contains? #{:tupleExpression}))
+                                        (let [patterns (map #(let [head (-> % second second)]
+                                                               (cond
+                                                                 (s/valid? ::boolean head)
+                                                                 head
+
+                                                                 (s/valid? ::wildcard head)
+                                                                 (second head)
+
+                                                                 :else %))
+                                                            (filter #(s/valid? ::pattern %) exprs))]
+                                          (if (empty? patterns)
+                                            ::s/invalid
+                                            patterns))
+
+                                        :else ::s/invalid))))
+
 (def column-tuple '(:tupleExpression
                     "["
                     (:expression (:primaryExpression (:identifier "x")))
@@ -179,6 +200,8 @@
 
 (def pattern-tuple '(:tupleExpression
                      "["
+                     (:expression (:primaryExpression "true"))
+                     ","
                      (:expression (:primaryExpression (:identifier "_")))
                      ","
                      (:expression (:primaryExpression "false"))
@@ -186,21 +209,35 @@
                      (:expression (:primaryExpression "true"))
                      "]"))
 
+
+(s/valid? ::pattern `(:expression (:primaryExpression (:identifier "_"))))
+
+(s/valid? ::column '(:expression (:primaryExpression (:identifier "y"))))
+
+(s/valid? ::column `(:expression (:primaryExpression (:identifier "_"))))
+
+(s/conform ::column '(:expression (:primaryExpression (:identifier "y"))))
+
+(s/conform ::pattern `(:expression (:primaryExpression (:identifier "_"))))
+
+(s/conform ::pattern `(:expression (:primaryExpression "false")))
+
+(s/valid? ::pattern-tuple pattern-tuple)
+
+(s/conform ::pattern-tuple pattern-tuple)
+
+(s/valid? ::pattern `(:expression (:primaryExpression "false")))
+
 (s/valid? ::column-tuple pattern-tuple)
 
-(s/conform ::column-tuple pattern-tuple)
-
-(s/valid? ::column-tuple '(:expression (:primaryExpression (:identifier "x"))) #_column-tuple)
+(s/valid? ::column-tuple '(:expression (:primaryExpression (:identifier "x"))))
 
 (s/valid? ::column-tuple column-tuple)
 
 (s/conform ::column-tuple column-tuple)
 
-(s/explain ::square-bracket-left "[")
+;; (s/explain ::square-bracket-left "[")
 
-(s/valid? ::column '(:expression (:primaryExpression (:identifier "y"))))
-
-(s/conform ::column '(:expression (:primaryExpression (:identifier "y"))))
 
 ;;;;;;;;;;;;;;;;;
 ;;---matcher---;;
@@ -208,7 +245,8 @@
 
 (defn dispatch-visitor [{:keys [:node :state :path]}]
   (cond
-    (s/valid? ::column-tuple node) (do (prn node " IS VALID") :column)
+    (s/valid? ::column-tuple node) (do (prn node "IS COLUMN") :column)
+    (s/valid? ::pattern-tuple node) (do (prn node "IS PATTERN") :pattern)
     :else :default))
 
 (defmulti visitor dispatch-visitor)
@@ -228,6 +266,14 @@
   (let [cols (s/conform ::column-tuple node)]
     (when-not (empty? cols)
       (swap! state update-in [:columns] conj cols)))
+  {:node node :state state :path path})
+
+(defmethod visitor :pattern
+  [{:keys [:node :state :path]}]
+  ;; (prn "INFO" "MATCH" node)
+  (let [pattern (s/conform ::pattern-tuple node)]
+    (when-not (empty? pattern)
+      (swap! state update-in [:patterns] conj pattern)))
   {:node node :state state :path path})
 
 ;;;;;;;;;;;;;;;;;;;;;
