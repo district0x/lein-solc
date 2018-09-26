@@ -6,73 +6,7 @@
    [clojure.spec.alpha :as s]
    [clojure.java.io :as io]
    [clj-antlr.core :as antlr]
-   ))
-
-(def ast `(:expression
-           (:expression (:primaryExpression (:identifier "matches")))
-           "("
-           (:functionCallArguments
-            (:expressionList
-
-             (:expression
-              (:primaryExpression
-
-               (:tupleExpression
-                "["
-                (:expression (:primaryExpression (:identifier "x")))
-                ","
-                (:expression (:primaryExpression (:identifier "y")))
-                ","
-                (:expression (:primaryExpression (:identifier "z")))
-                "]")))
-
-             ","
-
-             (:expression
-              (:primaryExpression
-
-               (:tupleExpression
-                "["
-                (:expression (:primaryExpression (:identifier "_")))
-                ","
-                (:expression (:primaryExpression "false"))
-                ","
-                (:expression (:primaryExpression "true"))
-                "]")
-
-               ))
-
-             ","
-
-             (:expression
-              (:expression (:primaryExpression (:identifier "Match")))
-              "."
-              (:identifier "One"))
-
-             ","
-
-             (:expression
-              (:primaryExpression
-
-               (:tupleExpression
-                "["
-                (:expression (:primaryExpression "false"))
-                ","
-                (:expression (:primaryExpression "true"))
-                ","
-                (:expression (:primaryExpression (:identifier "_")))
-                "]")
-
-               ))
-
-             ","
-
-             (:expression
-              (:expression (:primaryExpression (:identifier "Match")))
-              "."
-              (:identifier "Two"))))
-           ")")
-  )
+   [shim.dev :refer [ast]]))
 
 #_(defn expression-conformer [expr]
     (let [expr (-> expr second second)]
@@ -100,9 +34,9 @@
             matches?
             ast-editor)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;---TODO: with zippers---;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;
+;;---with zippers---;;
+;;;;;;;;;;;;;;;;;;;;;;
 
 ;;(clojure.pprint/pprint ast)
 
@@ -144,7 +78,7 @@
                  :next (s/spec (s/cat :val ::primary-expression
                                       :root (s/spec (s/cat :val ::identifier
                                                            :head #(and (string? %)
-                                                                   (not (= % wildcard))))))))))
+                                                                       (not (= % wildcard))))))))))
 
 (s/def ::pattern
   (s/spec (s/cat :val ::expression
@@ -152,6 +86,11 @@
                                       :root (s/or :boolean ::boolean
                                                   :wildcard ::wildcard))))))
 
+(s/def ::return (s/spec (s/cat :expression ::expression
+                               :primary-expression ::column
+                               :dot #{"."}
+                               :identifier (s/spec (s/cat :val ::identifier
+                                                          :head #(string? %))))))
 
 (s/def ::column-tuple (s/conformer (fn [expr]
                                      (cond
@@ -209,6 +148,14 @@
                      (:expression (:primaryExpression "true"))
                      "]"))
 
+(def return '(:expression
+              (:expression (:primaryExpression (:identifier "Match")))
+              "."
+              (:identifier "One")))
+
+(s/valid? ::return return)
+
+(s/explain ::return return)
 
 (s/valid? ::pattern `(:expression (:primaryExpression (:identifier "_"))))
 
@@ -238,15 +185,15 @@
 
 ;; (s/explain ::square-bracket-left "[")
 
-
 ;;;;;;;;;;;;;;;;;
 ;;---matcher---;;
 ;;;;;;;;;;;;;;;;;
 
 (defn dispatch-visitor [{:keys [:node :state :path]}]
   (cond
-    (s/valid? ::column-tuple node) (do (prn node "IS COLUMN") :column)
-    (s/valid? ::pattern-tuple node) (do (prn node "IS PATTERN") :pattern)
+    (s/valid? ::column-tuple node) :column
+    (s/valid? ::pattern-tuple node) :pattern
+    (s/valid? ::return node) :return
     :else :default))
 
 (defmulti visitor dispatch-visitor)
@@ -257,24 +204,30 @@
 
 (defmethod visitor :default
   [{:keys [:node :state :path]}]
-  ;; (prn "INFO" "node" node)
   {:node node :state state :path path})
 
 (defmethod visitor :column
   [{:keys [:node :state :path]}]
-  ;; (prn "INFO" "MATCH" node)
   (let [cols (s/conform ::column-tuple node)]
     (when-not (empty? cols)
-      (swap! state update-in [:columns] conj cols)))
+      (swap! state assoc :columns cols)))
   {:node node :state state :path path})
 
 (defmethod visitor :pattern
   [{:keys [:node :state :path]}]
-  ;; (prn "INFO" "MATCH" node)
   (let [pattern (s/conform ::pattern-tuple node)]
     (when-not (empty? pattern)
       (swap! state update-in [:patterns] conj pattern)))
   {:node node :state state :path path})
+
+(defmethod visitor :return
+  [{:keys [:node :state :path]}]
+  (let [pattern (s/conform ::return node)]
+    (swap! state update-in [:returns] conj
+           (str (-> pattern :primary-expression :next :root :head)
+                (:dot pattern)
+                (-> pattern :identifier :head)))
+  {:node node :state state :path path}))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;;---tree walker---;;
@@ -297,16 +250,28 @@
          (recur (zip/next updated-zipper)
                 updated-state))))))
 
+;;;;;;;;;;;;;;;;;;
+;;---generator---;;
+;;;;;;;;;;;;;;;;;;
+
+#_(defn gen-solidity [state]
+
+
+    )
+
+
 ;;;;;;;;;;;;;;
 ;;---test---;;
 ;;;;;;;;;;;;;;
 
 (def state (atom {:columns []
-                  :patterns []}))
+                  :patterns []
+                  :returns []}))
 
 (visit-tree (zip/seq-zip ast)
             state
             visitor)
+
 
 ;;;;;;;;;;;;;;;;
 ;;---parser---;;

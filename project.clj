@@ -7,6 +7,8 @@
                  [org.clojure/core.match "0.3.0-alpha5"]
                  [clojure-future-spec "1.9.0-beta4"]
                  [clj-antlr "0.2.4"]
+                 [org.antlr/ST4 "4.0.8"]
                  [clojure-watch "0.1.14"]]
+  :resource-paths ["resources"]
   ;; :eval-in-leiningen true
   )
