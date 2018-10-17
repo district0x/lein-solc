@@ -1,4 +1,2 @@
 return(return) ::= "return <return>;"
 match(columns, pattern, return) ::= "<if(columns)>if (<first(columns)> == <first(pattern)>) { <match(rest(columns), rest(pattern), return)> } <else> <return(return)> <endif>"
-
-

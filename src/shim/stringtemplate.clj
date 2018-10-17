@@ -3,39 +3,39 @@
   (:import [org.stringtemplate.v4 ST STGroup STGroupFile]))
 
 ;; if (y == false) {
-;; 	if (z == true) {
-;; 		return 1;
-;; 	}
-;; } 
+;;      if (z == true) {
+;;              return 1;
+;;      }
+;; }
 
 ;; if (x == false) {
-;; 	if (y == true) {
-;; 		return 2;
-;; 	}
+;;      if (y == true) {
+;;              return 2;
+;;      }
 ;; }
 
 ;; if (z == false) {
-;; 	return 3;
+;;      return 3;
 ;; }
 ;; return 4;
 
 ;; TODO: indentation
 (defn generate-solidity
-  [construct-type {:keys [:columns :patterns :returns]}]
+  [{:keys [:columns :patterns :returns]}]
   (let [keep-indices (fn [coll]
                        (keep-indexed #(if-not (= wildcard %2) %1)
                                      coll))
         filter-by-index (fn [coll idx]
                           (map (partial nth coll) idx))
         generate-match (fn [cols patt ret]
-                         (-> (STGroupFile. "resources/templates/solidity.stg")
+                         (-> (STGroupFile. "templates/solidity.stg")
                              (.getInstanceOf "match")
                              (.add "columns" cols)
                              (.add "pattern" patt)
                              (.add "return" ret)
                              (.render)))
         generate-return (fn [ret]
-                          (-> (STGroupFile. "resources/templates/solidity.stg")
+                          (-> (STGroupFile. "templates/solidity.stg")
                               (.getInstanceOf "return")
                               (.add "return" ret)
                               (.render)))]
@@ -49,15 +49,13 @@
                                           (filter-by-index head indices)
                                           (nth returns idx)))
                  (inc idx)))
-        ;; return last  
+        ;; return last
         (str res (generate-return (nth returns idx)))))))
 
-
-(def matches {:columns ["x" "y" "z"],
-              :patterns ['("_" "false" "true") '("false" "true" "_") '("_" "_" "false") '("_" "_" "true")]
-              :returns ["Match.One" "Match.Two" "Match.Three" "Match.Four"]})
-
-
-(generate-solidity :matches matches)
+(comment
+  (def matches {:columns ["x" "y" "z"],
+                :patterns ['("_" "false" "true") '("false" "true" "_") '("_" "_" "false") '("_" "_" "true")]
+                :returns ["Match.One" "Match.Two" "Match.Three" "Match.Four"]})
 
 
+  (generate-solidity matches))

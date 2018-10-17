@@ -1,6 +1,5 @@
 (ns leiningen.solc
   (:require
-
    [clojure-watch.core :as watch]
    [clojure.core.async :as async :refer [<!!]]
    [clojure.core.match :refer [match]]
@@ -9,7 +8,7 @@
    [clojure.string :as string]
    [leiningen.core.main :as lein]
    [shim.matches :as matches]
-
+   [shim.stringtemplate :as generator]
    ))
 
 (defn sh! [{:keys [err-only? verbose?] :as opts} & args]
@@ -55,15 +54,23 @@
                :options {:recursive true}}]))
     channel))
 
-
 ;; TODO: shim file in tmp dir before compiling
 (defn compile-contract [{:keys [filename src-path build-path solc-err-only verbose wc]}]
+  (let [file-path (str (ensure-slash src-path) filename)
+        ast (-> file-path
+                slurp
+                matches/parse)
+        initial-state (atom {:columns []
+                             :patterns []
+                             :returns []})
+        updated-state (matches/visit-tree ast initial-state)
+        solidity (generator/generate-solidity updated-state)]
 
-  (let [file-path (str (ensure-slash src-path) filename)]
-    (-> file-path
-        slurp
-        matches/parse
-        clojure.pprint/pprint))
+    (prn @updated-state)
+
+    (prn solidity)
+
+    )
 
 
   #_(sh/with-sh-dir src-path

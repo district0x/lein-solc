@@ -1,5 +1,6 @@
 (ns shim.matches
   (:require
+   [clojure.future :refer :all]
    [clojure.walk :as walk]
    [clojure.zip :as zip]
    [clojure.core.match :refer [match]]
@@ -7,38 +8,6 @@
    [clojure.java.io :as io]
    [clj-antlr.core :as antlr]
    [shim.dev :refer [ast]]))
-
-#_(defn expression-conformer [expr]
-    (let [expr (-> expr second second)]
-      (when-not (-> expr second (= wildcard))
-        (str "if(_var_ == " expr ")"))))
-
-#_(s/def ::expression (s/conformer expression-conformer))
-
-#_(defn ast-edit [zipper matcher editor]
-    (loop [loc zipper]
-      (if (zip/end? loc)
-        (zip/root loc)
-        (if-let [matcher-result (matcher (zip/node loc))]
-          (recur (zip/next (zip/edit loc (partial editor matcher-result))))
-          (recur (zip/next loc))))))
-
-#_(defn matches? [node]
-    (= "matches" (:identifier node)) #_true)
-
-#_(defn ast-editor [matcher-result node]
-    (prn "matcher-result:" matcher-result  "node" node)
-    node)
-
-#_(ast-edit (zip/seq-zip ast)
-            matches?
-            ast-editor)
-
-;;;;;;;;;;;;;;;;;;;;;;
-;;---with zippers---;;
-;;;;;;;;;;;;;;;;;;;;;;
-
-;;(clojure.pprint/pprint ast)
 
 ;; Match m =
 ;;          matches([x, y, z],
@@ -60,15 +29,12 @@
 ;;;;;;;;;;;;;;
 ;;---spec---;;
 ;;;;;;;;;;;;;;
+(def wildcard "_")
 
 (s/def ::expression #{:expression})
 (s/def ::primary-expression #{:primaryExpression})
 (s/def ::identifier #{:identifier})
 (s/def ::tuple-expression #{:tupleExpression})
-;; (s/def ::square-bracket-left #{"["})
-;; (s/def ::square-bracket-right #{"]"})
-;; (s/def ::comma #{","})
-(def wildcard "_")
 (s/def ::wildcard (s/cat :val ::identifier
                          :head #{wildcard}))
 (s/def ::boolean #{"false" "true"})
@@ -128,63 +94,6 @@
 
                                         :else ::s/invalid))))
 
-(def column-tuple '(:tupleExpression
-                    "["
-                    (:expression (:primaryExpression (:identifier "x")))
-                    ","
-                    (:expression (:primaryExpression (:identifier "y")))
-                    ","
-                    (:expression (:primaryExpression (:identifier "z")))
-                    "]"))
-
-(def pattern-tuple '(:tupleExpression
-                     "["
-                     (:expression (:primaryExpression "true"))
-                     ","
-                     (:expression (:primaryExpression (:identifier "_")))
-                     ","
-                     (:expression (:primaryExpression "false"))
-                     ","
-                     (:expression (:primaryExpression "true"))
-                     "]"))
-
-(def return '(:expression
-              (:expression (:primaryExpression (:identifier "Match")))
-              "."
-              (:identifier "One")))
-
-(s/valid? ::return return)
-
-(s/explain ::return return)
-
-(s/valid? ::pattern `(:expression (:primaryExpression (:identifier "_"))))
-
-(s/valid? ::column '(:expression (:primaryExpression (:identifier "y"))))
-
-(s/valid? ::column `(:expression (:primaryExpression (:identifier "_"))))
-
-(s/conform ::column '(:expression (:primaryExpression (:identifier "y"))))
-
-(s/conform ::pattern `(:expression (:primaryExpression (:identifier "_"))))
-
-(s/conform ::pattern `(:expression (:primaryExpression "false")))
-
-(s/valid? ::pattern-tuple pattern-tuple)
-
-(s/conform ::pattern-tuple pattern-tuple)
-
-(s/valid? ::pattern `(:expression (:primaryExpression "false")))
-
-(s/valid? ::column-tuple pattern-tuple)
-
-(s/valid? ::column-tuple '(:expression (:primaryExpression (:identifier "x"))))
-
-(s/valid? ::column-tuple column-tuple)
-
-(s/conform ::column-tuple column-tuple)
-
-;; (s/explain ::square-bracket-left "[")
-
 ;;;;;;;;;;;;;;;;;
 ;;---matcher---;;
 ;;;;;;;;;;;;;;;;;
@@ -227,14 +136,15 @@
            (str (-> pattern :primary-expression :next :root :head)
                 (:dot pattern)
                 (-> pattern :identifier :head)))
-  {:node node :state state :path path}))
+    {:node node :state state :path path}))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;;---tree walker---;;
 ;;;;;;;;;;;;;;;;;;;;;
 
-(defn visit-tree
-  ([zipper visitor] (visit-tree zipper nil visitor))
+(defn- visit-tree*
+  ([zipper visitor]
+   (visit-tree* zipper nil visitor))
   ([zipper initial-state visitor]
    (loop [loc zipper
           state initial-state]
@@ -250,28 +160,14 @@
          (recur (zip/next updated-zipper)
                 updated-state))))))
 
-;;;;;;;;;;;;;;;;;;
-;;---generator---;;
-;;;;;;;;;;;;;;;;;;
-
-#_(defn gen-solidity [state]
-
-
-    )
-
-
-;;;;;;;;;;;;;;
-;;---test---;;
-;;;;;;;;;;;;;;
-
-(def state (atom {:columns []
-                  :patterns []
-                  :returns []}))
-
-(visit-tree (zip/seq-zip ast)
-            state
-            visitor)
-
+(defn visit-tree
+  "Given syntax-tree and initial state
+  returns updated state"
+  [ast state]
+  (visit-tree* (zip/seq-zip ast)
+               state
+               visitor)
+  state)
 
 ;;;;;;;;;;;;;;;;
 ;;---parser---;;
@@ -284,3 +180,71 @@
 (defn parse [code]
   (let [[_ & statements] (parse-solidity code)]
     statements))
+
+;;;;;;;;;;;;;;
+;;---test---;;
+;;;;;;;;;;;;;;
+
+(comment
+  (def state (atom {:columns []
+                    :patterns []
+                    :returns []}))
+
+  (visit-tree ast
+              state)
+
+  (def column-tuple '(:tupleExpression
+                      "["
+                      (:expression (:primaryExpression (:identifier "x")))
+                      ","
+                      (:expression (:primaryExpression (:identifier "y")))
+                      ","
+                      (:expression (:primaryExpression (:identifier "z")))
+                      "]"))
+
+  (def pattern-tuple '(:tupleExpression
+                       "["
+                       (:expression (:primaryExpression "true"))
+                       ","
+                       (:expression (:primaryExpression (:identifier "_")))
+                       ","
+                       (:expression (:primaryExpression "false"))
+                       ","
+                       (:expression (:primaryExpression "true"))
+                       "]"))
+
+  (def return '(:expression
+                (:expression (:primaryExpression (:identifier "Match")))
+                "."
+                (:identifier "One")))
+
+  (s/valid? ::return return)
+
+  (s/explain ::return return)
+
+  (s/valid? ::pattern `(:expression (:primaryExpression (:identifier "_"))))
+
+  (s/valid? ::column '(:expression (:primaryExpression (:identifier "y"))))
+
+  (s/valid? ::column `(:expression (:primaryExpression (:identifier "_"))))
+
+  (s/conform ::column '(:expression (:primaryExpression (:identifier "y"))))
+
+  (s/conform ::pattern `(:expression (:primaryExpression (:identifier "_"))))
+
+  (s/conform ::pattern `(:expression (:primaryExpression "false")))
+
+  (s/valid? ::pattern-tuple pattern-tuple)
+
+  (s/conform ::pattern-tuple pattern-tuple)
+
+  (s/valid? ::pattern `(:expression (:primaryExpression "false")))
+
+  (s/valid? ::column-tuple pattern-tuple)
+
+  (s/valid? ::column-tuple '(:expression (:primaryExpression (:identifier "x"))))
+
+  (s/valid? ::column-tuple column-tuple)
+
+  (s/conform ::column-tuple column-tuple)
+  )
