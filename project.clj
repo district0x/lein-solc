@@ -1,4 +1,4 @@
-(defproject lein-solc "1.0.1-1"
+(defproject lein-solc "1.0.2-SNAPSHOT"
   :description "lein plugin for compiling solidity contracts"
   :url "https://github.com/district0x/lein-solc"
   :license {:name "WTFPL"

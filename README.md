@@ -7,7 +7,7 @@ A Leiningen plugin for compiling [Solidity](https://solidity.readthedocs.io/) sm
 Add to `:plugins` vector of your project.clj:
 
 ```clojure
-:plugins [[lein-solc "1.0.1-1"]]
+:plugins [[lein-solc "1.0.2"]]
 ```
 Plugin assumes [**solc** compiler](http://solidity.readthedocs.io/en/v0.4.21/installing-solidity.html) is installed and on your `$PATH`.
 
@@ -17,10 +17,11 @@ You can specify the contracts to compile by adding an `:solc` map to your projec
 It takes the following key value pairs:
 * `:src-path` string with the path where the *.sol* source files are residing, relative to the projects root path.
 * `:build-path` string with the path where the compiled binaries and ABI Json files are written to, relative to the projects root directory.
-* `:contracts` vector of files with the Solidity contracts source code, relative to the **src-path** directory, you can also specify sub-directories or `:all` to compile all the contracts in the root of the **src-path**.
+* `:contracts` vector of files with the Solidity contracts source code, relative to the **src-path** directory (you can also specify sub-directories), or `:all` to compile all of the contracts in the root of the **src-path**.
 * `:solc-err-only` (optional) boolean, if `true` (default value) only compilation errors will be reported to the **STDOUT**.
 * `:verbose` (optional) boolean, if `false` (default value) the **STDOUT** output is limited to the most important information.
 * `:wc` boolean, if `true` after succesfull compilation the number of characters of the compiled bin file will be printed to the **STDOUT**.
+* `:optimize-runs` (optional) map of contract filenames and parameter `n` values, where `0 <= n < inf` is an estimated number of contract runs for optimizer tuning. It represents a trade-off between a smaller bytecode (low values) and cheaper transaction costs (high values).
 
 Example:
 
@@ -29,7 +30,8 @@ Example:
        :build-path "resources/contracts/build/"
        :contracts ["MyContract.sol" "sub/MySecondContract.sol"]
        :solc-err-only true
-       :wc true}
+       :wc true
+       :optimize-runs {"MyContract.sol" 1}}
 ```
 
 The contracts in `:contracts` will be compiled when you do:

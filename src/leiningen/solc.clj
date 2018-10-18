@@ -50,17 +50,24 @@
                :options {:recursive true}}]))
     channel))
 
-(defn compile-contract [{:keys [filename src-path build-path solc-err-only verbose wc]}]
-  (sh/with-sh-dir src-path
-    (let [exit-status (sh! {:err-only? solc-err-only :verbose? verbose} "solc" "--overwrite" "--optimize" "--bin" "--abi" filename "-o" build-path)]
-      (when (and (zero? exit-status) wc)
-        (sh! {:err-only? nil :verbose? verbose} "wc" "-c" (str (ensure-slash build-path)
-                                                               (-> (-> filename
-                                                                       (string/split #"/")
-                                                                       last)
-                                                                   (string/split #"\.")
-                                                                   first
-                                                                   (str ".bin"))))))))
+(defn compile-contract [{:keys [filename src-path build-path solc-err-only verbose wc optimize-runs]}]
+  (let [runs (or (cond
+                   (integer? optimize-runs)
+                   optimize-runs
+
+                   (map? optimize-runs)
+                   (get optimize-runs filename))
+                 200)]
+    (sh/with-sh-dir src-path
+      (let [exit-status (sh! {:err-only? solc-err-only :verbose? verbose} "solc" "--overwrite" "--optimize" "--optimize-runs" (str runs) "--bin" "--abi" filename "-o" build-path)]
+        (when (and (zero? exit-status) wc)
+          (sh! {:err-only? nil :verbose? verbose} "wc" "-c" (str (ensure-slash build-path)
+                                                                 (-> (-> filename
+                                                                         (string/split #"/")
+                                                                         last)
+                                                                     (string/split #"\.")
+                                                                     first
+                                                                     (str ".bin")))))))))
 
 (defn walk-dir [path pattern subdirs?]
   (doall (filter #(re-matches pattern (.getName %))
@@ -73,9 +80,12 @@
   Usage:
   `lein solc once` or `lein solc auto`"
   [project & [args]]
-  (let [{:keys [src-path build-path contracts solc-err-only verbose wc]
+  (let [{:keys [src-path build-path contracts solc-err-only verbose wc optimize-runs]
          :or {solc-err-only true verbose false}
          :as opts} (:solc project)
+        full-build-path (-> (.getCanonicalPath (clojure.java.io/file "."))
+                            ensure-slash
+                            (str build-path))
         contracts-map (cond (sequential? contracts)
                             (reduce (fn [m c]
                                       (assoc m (str (ensure-slash src-path) c) c))
@@ -92,40 +102,30 @@
                                     (walk-dir src-path #".*\.sol" false))
 
                             :else (lein/abort "Unknown `:contracts` option found in project.clj"))
-
-        full-build-path (-> (.getCanonicalPath (clojure.java.io/file "."))
-                            ensure-slash
-                            (str build-path))
+        opts-map {:src-path src-path
+                  :build-path full-build-path
+                  :solc-err-only solc-err-only
+                  :verbose verbose
+                  :wc wc
+                  :optimize-runs optimize-runs}
         once (fn [] (cond (sequential? contracts)
                           (doseq [c contracts]
-                            (compile-contract {:filename c
-                                               :src-path src-path
-                                               :build-path full-build-path
-                                               :solc-err-only solc-err-only
-                                               :verbose verbose
-                                               :wc wc}))
+                            (compile-contract (merge opts-map
+                                                     {:filename c})))
 
                           (= :all contracts)
                           (doseq [[path c] contracts-map]
-                            (compile-contract {:filename (-> path
-                                                             (string/split (re-pattern (ensure-slash src-path)))
-                                                             last)
-                                               :src-path src-path
-                                               :build-path full-build-path
-                                               :solc-err-only solc-err-only
-                                               :verbose verbose
-                                               :wc wc}))))
+                            (compile-contract (merge opts-map
+                                                     {:filename (-> path
+                                                                    (string/split (re-pattern (ensure-slash src-path)))
+                                                                    last)})))))
         auto (fn [] (let [watcher (start-watcher src-path)]
                       (while true
                         (let [filename (<!! watcher)]
                           (if (contains? (-> contracts-map keys set) filename)
                             (do (lein/info (format "%s has changed" filename))
-                                (compile-contract {:filename (get contracts-map filename)
-                                                   :src-path src-path
-                                                   :build-path full-build-path
-                                                   :solc-err-only solc-err-only
-                                                   :verbose verbose
-                                                   :wc wc}))
+                                (compile-contract (merge opts-map
+                                                         {:filename (get contracts-map filename)})))
                             (lein/info (format "Ignoring changes in %s" filename)))))))]
     (cond
       (not opts)
