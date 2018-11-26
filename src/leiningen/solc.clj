@@ -64,11 +64,11 @@
                              :patterns []
                              :returns []})
         updated-state (matches/visit-tree ast initial-state)
-        solidity (generator/generate-solidity updated-state)]
-
-    (prn @updated-state)
+        solidity (generator/generate-solidity @updated-state)]
 
     (prn solidity)
+    ;; TODO: replace in source
+    ;; TODO : compile (in memory?)
 
     )
 

@@ -1,6 +1,6 @@
 (ns shim.matches
   (:require
-   [clojure.future :refer :all]
+   ;; [clojure.future :refer :all]
    [clojure.walk :as walk]
    [clojure.zip :as zip]
    [clojure.core.match :refer [match]]
