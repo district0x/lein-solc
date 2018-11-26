@@ -4,7 +4,7 @@ A Leiningen plugin for compiling [Solidity](https://solidity.readthedocs.io/) sm
 
 ## Installation
 
-lein-solc is available from Clojars. The latest released version is:
+lein-solc is available from Clojars. The latest released version is: <br>
 [![Clojars Project](https://img.shields.io/clojars/v/lein-solc.svg)](https://clojars.org/lein-solc) <br>
 Add it to the `:plugins` vector of your project.clj.
 
