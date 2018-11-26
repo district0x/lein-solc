@@ -4,11 +4,10 @@ A Leiningen plugin for compiling [Solidity](https://solidity.readthedocs.io/) sm
 
 ## Installation
 
-Add to `:plugins` vector of your project.clj:
+lein-solc is available from Clojars. The latest released version is:
+[![Clojars Project](https://img.shields.io/clojars/v/lein-solc.svg)](https://clojars.org/lein-solc) <br>
+Add it to the `:plugins` vector of your project.clj.
 
-```clojure
-:plugins [[lein-solc "1.0.2"]]
-```
 Plugin assumes [**solc** compiler](http://solidity.readthedocs.io/en/v0.4.21/installing-solidity.html) is installed and on your `$PATH`.
 
 ## Usage
