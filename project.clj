@@ -1,4 +1,4 @@
-(defproject lein-solc "1.0.8-SNAPSHOT"
+(defproject lein-solc "1.0.9-SNAPSHOT"
   :description "lein plugin for compiling solidity contracts"
   :url "https://github.com/district0x/lein-solc"
   :license {:name "WTFPL"
@@ -6,7 +6,8 @@
 
   :dependencies [[org.clojure/core.async "0.4.474"]
                  [org.clojure/core.match "0.3.0-alpha5"]
-                 [clojure-watch "0.1.14"]]
+                 [clojure-watch "0.1.14"]
+                 [cheshire "5.8.1"]]
 
   :plugins [[lein-shell "0.5.0"]]
 

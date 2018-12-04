@@ -104,8 +104,9 @@
                                       "--bin"
                                       "--abi"
                                       filename)
-            [_ _ bin _ abi] (-> (last (-> output
-                                          (string/split #"=======")))
+            [_ _ bin _ abi] (-> output
+                                (string/split #"=======")
+                                (nth 2)
                                 (string/split #"\n"))]
         (when (zero? exit-status)
           (when truffle-artifacts?
