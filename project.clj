@@ -1,4 +1,4 @@
-(defproject lein-solc "1.0.6-SNAPSHOT"
+(defproject lein-solc "1.0.8-SNAPSHOT"
   :description "lein plugin for compiling solidity contracts"
   :url "https://github.com/district0x/lein-solc"
   :license {:name "WTFPL"
@@ -21,21 +21,11 @@
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]
-                  ["vcs" "commit" "Version ${:version} [ci skip]"]
+                  ["vcs" "commit" "Version %s [ci skip]"]
                   ["vcs" "tag" "v" "--no-sign"]
-                  #_["deploy"]
-                  ["change" "version" "leiningen.release/bump-version"]
-                  ["vcs" "commit" "Version ${:version} [ci skip]"]
-                  ["vcs" "push"]]
-
-  #_[["vcs" "assert-committed"]
-     ["change" "version" "leiningen.release/bump-version"]
-     ["change" "version" "leiningen.release/bump-version" "release"]
-     ["vcs" "commit" "-am" "Version ${:version} [ci skip]"]
-     ["vcs" "tag" "v" "--no-sign"] ; disable signing and add "v" prefix
-     ["deploy"]
-     ["change" "version" "leiningen.release/bump-version" "qualifier"]
-     ["vcs" "commit" "-am" "Version ${:version} [ci skip]"]
-     ["vcs" "push"]]
+                  ["deploy"]
+                  #_["change" "version" "leiningen.release/bump-version"]
+                  #_["vcs" "commit" "Version %s [ci skip]"]
+                  #_["vcs" "push"]]
 
   :eval-in-leiningen true)

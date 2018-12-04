@@ -10,6 +10,6 @@ env:
 deploy:
 - provider: script
   skip_cleanup: true
-  script: bash travis/deploy.sh :patch
+  script: bash travis/deploy.sh
   on:
     branch: master
