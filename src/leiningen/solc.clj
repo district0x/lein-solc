@@ -51,25 +51,35 @@
                :options {:recursive true}}]))
     channel))
 
-(defn count-bytes [{:keys [build-path verbose contract-name]}]
-  (sh! {:err-only? nil :verbose? verbose} "wc" "-c" (str (ensure-slash build-path)
-                                                         contract-name
-                                                         ".bin")))
+(defn count-bytes [{:keys [build-path verbose contract-name filename]}]
+  ;; contracts import other contracts, which causes the compiled output to be produced multiple times
+  ;; this is to avoid printing the bytecount multiple times for the same contract
+  ;; only contracts in the :contracts vector will be reported
+  ;; if :all is used this means contracts in the root of src-dir
+  (when (= contract-name (-> (-> filename
+                                 (string/split #"/")
+                                 last)
+                             (string/split #"\.")
+                             first))
+    (sh! {:err-only? nil :verbose? verbose} "wc" "-c" (str (ensure-slash build-path)
+                                                           contract-name
+                                                           ".bin"))))
 
-;; TODO if exists update
+;; TODO : if artifact exists update :updatedAt :bytecode and :abi
 (defn write-truffle-artifact [{:keys [src-path build-path contract-name abi bin]}]
-  (spit (str (ensure-slash build-path)
-             contract-name
-             ".json")
-        (json/generate-string
-         {:contractName contract-name
-          :abi (json/parse-string abi)
-          :bytecode bin
-          :sourcePath (-> (str (ensure-slash src-path) contract-name ".sol"))
-          :networks {}
-          :schemaVersion "2.0.1"
-          :updatedAt (new java.util.Date)}
-         {:pretty true})))
+  (let [bin (if (empty? bin) "0x" bin)]
+    (spit (str (ensure-slash build-path)
+               contract-name
+               ".json")
+          (json/generate-string
+           {:contractName contract-name
+            :abi (json/parse-string abi)
+            :bytecode bin
+            :sourcePath (-> (str (ensure-slash src-path) contract-name ".sol"))
+            :networks {}
+            :schemaVersion "2.0.1"
+            :updatedAt (new java.util.Date)}
+           {:pretty true}))))
 
 (defn write-abi [{:keys [build-path contract-name abi]}]
   (spit (str (ensure-slash build-path)
@@ -92,31 +102,36 @@
                    (get optimize-runs filename))
                  200)]
     (sh/with-sh-dir src-path
-      (let [contract-name (-> (-> filename
-                                  (string/split #"/")
-                                  last)
-                              (string/split #"\.")
-                              first)
-            [exit-status output] (sh! {:err-only? solc-err-only :verbose? verbose} "solc"
+      (let [[exit-status output] (sh! {:err-only? solc-err-only :verbose? verbose} "solc"
                                       "--overwrite"
                                       "--optimize"
                                       "--optimize-runs" (str runs)
                                       "--bin"
                                       "--abi"
                                       filename)
-            [_ _ bin _ abi] (-> output
-                                (string/split #"=======")
-                                (nth 2)
-                                (string/split #"\n"))]
+            compiled-contracts (string/split output #"=======")]
         (when (zero? exit-status)
-          (when truffle-artifacts?
-            (write-truffle-artifact (merge opts-map {:contract-name contract-name :abi abi :bin bin})))
-          (when bin?
-            (write-bin (merge opts-map {:contract-name contract-name :bin bin}))
-            (when byte-count
-              (count-bytes (merge opts-map {:contract-name contract-name}))))
-          (when abi?
-            (write-abi (merge opts-map {:contract-name contract-name :abi abi}))))))))
+          (doall
+           (for [position (range 1 (count compiled-contracts) 2)]
+             (let [[_ contract-name] (-> compiled-contracts
+                                         (nth position)
+                                         (string/trim)
+                                         (string/split #":"))
+                   [_ _ bin _ abi] (-> compiled-contracts
+                                       (nth (inc position))
+                                       (string/split #"\n"))]
+               (when-not (empty? bin)
+
+                 (when truffle-artifacts?
+                   (write-truffle-artifact (merge opts-map {:contract-name contract-name :abi abi :bin bin})))
+
+                 (when bin?
+                   (write-bin (merge opts-map {:contract-name contract-name :bin bin}))
+                   (when byte-count
+                     (count-bytes (merge opts-map {:contract-name contract-name}))))
+
+                 (when abi?
+                   (write-abi (merge opts-map {:contract-name contract-name :abi abi}))))))))))))
 
 (defn walk-dir [path pattern subdirs?]
   (doall (filter #(re-matches pattern (.getName %))
@@ -129,7 +144,7 @@
   Usage:
   `lein solc once` or `lein solc auto`"
   [project & [args]]
-  (let [{:keys [src-path build-path contracts solc-err-only verbose ]
+  (let [{:keys [src-path build-path contracts]
          :as opts} (merge
                     {:solc-err-only true :verbose false :abi? true :bin? true}
                     (:solc project))
