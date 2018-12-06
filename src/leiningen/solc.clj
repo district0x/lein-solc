@@ -93,6 +93,11 @@
              ".bin")
         bin))
 
+(defn create-directory [{:keys [build-path]}]
+  (let [file (io/file (ensure-slash build-path))]
+    (when-not (.isDirectory file)
+      (.mkdirs file))))
+
 (defn compile-contract [{:keys [filename src-path build-path abi? bin? truffle-artifacts? solc-err-only verbose byte-count optimize-runs] :as opts-map}]
   (let [runs (or (cond
                    (integer? optimize-runs)
@@ -121,6 +126,8 @@
                                        (nth (inc position))
                                        (string/split #"\n"))]
                (when-not (empty? bin)
+
+                 (create-directory opts-map)
 
                  (when truffle-artifacts?
                    (write-truffle-artifact (merge opts-map {:contract-name contract-name :abi abi :bin bin})))
