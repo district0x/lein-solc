@@ -102,9 +102,19 @@
     (when-not (.isDirectory file)
       (.mkdirs file))))
 
-;; TODO: shim file in tmp dir before compiling
+;; TODO : get code
+;; TODO : pass to parser
+;; TODO : generate shim (solidity code)
+;; TODO : in tmp dir replace code with shim in the source file
+;; TODO : pass shimmed file for compiling
+
+(defn get-code
+  [file]
+  (first (re-find #"(?is)(matches\()(.*)(\);)" (slurp file))))
+
 (defn compile-contract [{:keys [filename src-path build-path abi? bin? truffle-artifacts? solc-err-only verbose byte-count optimize-runs] :as opts-map}]
   (let [file-path (str (ensure-slash src-path) filename)
+        code (get-code file-path)
         ast (-> file-path
                 slurp
                 matches/parse)
@@ -112,7 +122,7 @@
                              :patterns []
                              :returns []})
         updated-state (matches/visit-tree ast initial-state)
-        solidity (generator/generate-solidity @updated-state)
+        shim (generator/generate-solidity @updated-state)
         runs (or (cond
                    (integer? optimize-runs)
                    optimize-runs
@@ -121,8 +131,14 @@
                    (get optimize-runs filename))
                  200)]
 
-    (prn solidity)
-    ;; TODO: replace in source
+    (prn
+     code
+     shim
+      )
+
+
+
+    ;; TODO : replace in source
     ;; TODO : compile (in memory?)
 
     #_(sh/with-sh-dir src-path

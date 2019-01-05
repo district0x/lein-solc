@@ -7,7 +7,7 @@
    [clojure.spec.alpha :as s]
    [clojure.java.io :as io]
    [clj-antlr.core :as antlr]
-   [shim.dev :refer [ast]]))
+   #_[shim.dev :refer [ast]]))
 
 ;; Match m =
 ;;          matches([x, y, z],
@@ -30,6 +30,7 @@
 ;;---spec---;;
 ;;;;;;;;;;;;;;
 (def wildcard "_")
+(def matches "matches")
 
 (s/def ::expression #{:expression})
 (s/def ::primary-expression #{:primaryExpression})
