@@ -6,30 +6,10 @@
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [clojure.walk :as walk]
-   [clojure.zip :as zip]
-   #_[shim.dev :refer [ast]])
+   [clojure.zip :as zip])
   (:import [org.stringtemplate.v4 ST STGroup STGroupFile]))
 
-;; Match m =
-;;          matches([x, y, z],
-;;                  [_, false, true], Match.One,
-;;                  [false, true, _], Match.Two
-;;                  [_, _, false], Match.Three,
-;;                  [_, _, true], Match.Four);
-
-;; if (y == false && z == true) {
-;;      return 1;
-;; } else if (x == false && y == true) {
-;;      return 2;
-;; } else if (z == false) {
-;;      return 3;
-;; } else {
-;;      return 4;
-;; }
-
-;;;;;;;;;;;;;;
-;;---spec---;;
-;;;;;;;;;;;;;;
+;; spec
 (def wildcard "_")
 (def matches "matches")
 
@@ -96,9 +76,7 @@
 
                                         :else ::s/invalid))))
 
-;;;;;;;;;;;;;;;;;
-;;---matcher---;;
-;;;;;;;;;;;;;;;;;
+;; matcher
 
 (defn dispatch-visitor [{:keys [:node :state :path]}]
   (cond
@@ -109,9 +87,7 @@
 
 (defmulti visitor dispatch-visitor)
 
-;;;;;;;;;;;;;;;;;
-;;---editors---;;
-;;;;;;;;;;;;;;;;;
+;; editors
 
 (defmethod visitor :default
   [{:keys [:node :state :path]}]
@@ -140,9 +116,7 @@
                 (-> pattern :identifier :head)))
     {:node node :state state :path path}))
 
-;;;;;;;;;;;;;;;;;;;;;
-;;---tree walker---;;
-;;;;;;;;;;;;;;;;;;;;;
+;; syntax tree walker
 
 (defn- visit-tree*
   ([zipper visitor]
@@ -171,9 +145,7 @@
                visitor)
   state)
 
-;;;;;;;;;;;;;;;;
-;;---parser---;;
-;;;;;;;;;;;;;;;;
+;; parser
 
 (def parse-solidity (-> (io/resource "grammar/Solidity.g4")
                         slurp
@@ -183,9 +155,7 @@
   (let [[_ & statements] (parse-solidity code)]
     statements))
 
-;;;;;;;;;;;;;;
-;;---test---;;
-;;;;;;;;;;;;;;
+;; test
 
 (comment
   (def state (atom {:columns []
@@ -251,9 +221,7 @@
   (s/conform ::column-tuple column-tuple)
   )
 
-;;;;;;;;;;;;;;;;;;;
-;;---generator---;;
-;;;;;;;;;;;;;;;;;;;
+;; generator
 
 (defn generate-solidity
   [{:keys [:columns :patterns :returns]}]
@@ -287,9 +255,7 @@
         ;; return last
         (str res (generate-return (nth returns idx)))))))
 
-;;;;;;;;;;;;;;
-;;---test---;;
-;;;;;;;;;;;;;;
+;; test
 
 (comment
   (def matches {:columns ["x" "y" "z"],
@@ -298,9 +264,7 @@
 
   (generate-solidity matches))
 
-;;;;;;;;;;;;;;
-;;---shim---;;
-;;;;;;;;;;;;;;
+;; shim
 
 (defn get-matches-code
   [code]
