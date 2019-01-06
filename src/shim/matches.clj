@@ -1,6 +1,5 @@
 (ns shim.matches
   (:require
-   ;; [clojure.future :refer :all]
    [clj-antlr.core :as antlr]
    [clojure.core.match :refer [match]]
    [clojure.java.io :as io]
@@ -308,14 +307,17 @@
   (first (re-find #"(?is)(matches\()(.*)(\);)" code)))
 
 (defn shim
-  "given a vanilla source code passes it through shim and
-  returns a string with the shimmed source code."
+  "Given a vanilla source code passes it through shim and
+  returns a string with the shimmed source code.
+  Idempotent : vanilla solidity code is returned as-is."
   [code]
-  (let [ast (parse code)
-        initial-state (atom {:columns []
-                             :patterns []
-                             :returns []})
-        updated-state (visit-tree ast initial-state)
-        shim (generate-solidity @updated-state)
-        replacement (get-matches-code code)]
-    (string/replace code replacement shim)))
+  (if-let [replacement (get-matches-code code)]
+    (let [ast (parse code)
+          initial-state (atom {:columns []
+                               :patterns []
+                               :returns []})
+          updated-state (visit-tree ast initial-state)
+          shim (generate-solidity @updated-state)
+          replacement (get-matches-code code)]
+      (string/replace code replacement shim))
+    code))
