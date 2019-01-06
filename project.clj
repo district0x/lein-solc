@@ -1,4 +1,4 @@
-(defproject lein-solc "1.1.11-SNAPSHOT"
+(defproject lein-solc "1.1.12-SNAPSHOT"
   :description "lein plugin for compiling solidity contracts"
   :author "Filip Bielejec"
   :url "https://github.com/district0x/lein-solc"
