@@ -1,15 +1,20 @@
-(defproject lein-solc "1.0.11-SNAPSHOT"
+(defproject lein-solc "1.1.11-SNAPSHOT"
   :description "lein plugin for compiling solidity contracts"
+  :author "Filip Bielejec"
   :url "https://github.com/district0x/lein-solc"
   :license {:name "WTFPL"
             :url "http://www.wtfpl.net/"}
 
-  :dependencies [[org.clojure/core.async "0.4.474"]
-                 [org.clojure/core.match "0.3.0-alpha5"]
+  :dependencies [[clj-antlr "0.2.4"]
+                 [clojure-future-spec "1.9.0-beta4"]
+                 [me.raynes/fs "1.4.6"]
                  [clojure-watch "0.1.14"]
-                 [cheshire "5.8.1"]]
+                 [cheshire "5.8.1"]
+                 [org.antlr/ST4 "4.0.8"]
+                 [org.clojure/core.match "0.3.0-alpha5"]
+                 [org.clojure/core.async "0.4.474"]]
 
-  :plugins [[lein-shell "0.5.0"]]
+  :resource-paths ["resources"]
 
   :deploy-repositories [["snapshots" {:url "https://clojars.org/repo"
                                       :username :env/clojars_username
@@ -22,11 +27,6 @@
 
   :release-tasks [["vcs" "assert-committed"]
                   ["change" "version" "leiningen.release/bump-version" "release"]
-                  ["vcs" "commit" "Version %s [ci skip]"]
-                  ["vcs" "tag" "v" "--no-sign"]
-                  ["deploy"]
-                  #_["change" "version" "leiningen.release/bump-version"]
-                  #_["vcs" "commit" "Version %s [ci skip]"]
-                  #_["vcs" "push"]]
+                  ["deploy"]]
 
   :eval-in-leiningen true)

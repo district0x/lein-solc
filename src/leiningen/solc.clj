@@ -1,12 +1,15 @@
 (ns leiningen.solc
-  (:require [cheshire.core :as json]
-            [clojure-watch.core :as watch]
-            [clojure.core.async :as async :refer [<!!]]
-            [clojure.core.match :refer [match]]
-            [clojure.java.io :as io]
-            [clojure.java.shell :as sh]
-            [clojure.string :as string]
-            [leiningen.core.main :as lein]))
+  (:require
+   [cheshire.core :as json]
+   [clojure-watch.core :as watch]
+   [clojure.core.async :as async :refer [<!!]]
+   [clojure.core.match :refer [match]]
+   [clojure.java.io :as io]
+   [clojure.java.shell :as sh]
+   [clojure.string :as string]
+   [leiningen.core.main :as lein]
+   [fs.fs :as fs]
+   [shim.matches :as matches]))
 
 (defn sh! [{:keys [err-only? verbose?] :as opts} & args]
   (when verbose?
@@ -35,11 +38,6 @@
                              :output? output?}))
     [exit out]))
 
-(defn ensure-slash [path]
-  (if (string/ends-with? path "/")
-    path
-    (str path "/")))
-
 (defn start-watcher
   [path]
   (let [channel (async/chan)]
@@ -61,51 +59,65 @@
                                  last)
                              (string/split #"\.")
                              first))
-    (sh! {:err-only? nil :verbose? verbose} "wc" "-c" (str (ensure-slash build-path)
+    (sh! {:err-only? nil :verbose? verbose} "wc" "-c" (str (fs/ensure-slash build-path)
                                                            contract-name
                                                            ".bin"))))
 
 ;; TODO : if artifact exists update :updatedAt :bytecode and :abi
 (defn write-truffle-artifact [{:keys [src-path build-path contract-name abi bin]}]
   (let [bin (if (empty? bin) "0x" bin)]
-    (spit (str (ensure-slash build-path)
+    (spit (str (fs/ensure-slash build-path)
                contract-name
                ".json")
           (json/generate-string
            {:contractName contract-name
             :abi (json/parse-string abi)
             :bytecode bin
-            :sourcePath (-> (str (ensure-slash src-path) contract-name ".sol"))
+            :sourcePath (-> (str (fs/ensure-slash src-path) contract-name ".sol"))
             :networks {}
             :schemaVersion "2.0.1"
             :updatedAt (new java.util.Date)}
            {:pretty true}))))
 
 (defn write-abi [{:keys [build-path contract-name abi]}]
-  (spit (str (ensure-slash build-path)
+  (spit (str (fs/ensure-slash build-path)
              contract-name
              ".abi")
         abi))
 
 (defn write-bin [{:keys [build-path contract-name bin]}]
-  (spit (str (ensure-slash build-path)
+  (spit (str (fs/ensure-slash build-path)
              contract-name
              ".bin")
         bin))
 
-(defn create-directory [{:keys [build-path]}]
-  (let [file (io/file (ensure-slash build-path))]
-    (when-not (.isDirectory file)
-      (.mkdirs file))))
+(defn compile-contract [{:keys [filename src-path build-path
+                                abi? bin? truffle-artifacts?
+                                solc-err-only verbose byte-count
+                                optimize-runs
+                                temp-src-path shim]
+                         :as opts-map}]
 
-(defn compile-contract [{:keys [filename src-path build-path abi? bin? truffle-artifacts? solc-err-only verbose byte-count optimize-runs] :as opts-map}]
-  (let [runs (or (cond
+  (when shim
+    (let [code (slurp (str (fs/ensure-slash src-path) filename))]
+      (cond->> code
+        (some #(= :matches %) shim) matches/shim
+        ;; TODO : future shims go here
+        ;; after shimming write to temp dir
+        true (spit (str (fs/ensure-slash temp-src-path) filename)))))
+
+  (let [src-path (if shim
+                   ;; use temp dir if source code is shimmed
+                   temp-src-path
+                   src-path)
+        runs (or (cond
                    (integer? optimize-runs)
                    optimize-runs
 
                    (map? optimize-runs)
                    (get optimize-runs filename))
                  200)]
+
     (sh/with-sh-dir src-path
       (let [[exit-status output] (sh! {:err-only? solc-err-only :verbose? verbose} "solc"
                                       "--overwrite"
@@ -126,8 +138,7 @@
                                        (nth (inc position))
                                        (string/split #"\n"))]
                (when-not (empty? bin)
-
-                 (create-directory opts-map)
+                 (fs/safe-create-dir! build-path)
 
                  (when truffle-artifacts?
                    (write-truffle-artifact (merge opts-map {:contract-name contract-name :abi abi :bin bin})))
@@ -140,32 +151,29 @@
                  (when abi?
                    (write-abi (merge opts-map {:contract-name contract-name :abi abi}))))))))))))
 
-(defn walk-dir [path pattern subdirs?]
-  (doall (filter #(re-matches pattern (.getName %))
-                 (if subdirs?
-                   (file-seq (io/file path))
-                   (.listFiles (io/file path))))))
-
 (defn solc
   "Lein plugin for compiling solidity contracts.
   Usage:
   `lein solc once` or `lein solc auto`"
   [project & [args]]
-  (let [{:keys [src-path build-path contracts]
+  (let [{:keys [src-path build-path contracts shim]
          :as opts} (merge
                     {:solc-err-only true :verbose false :abi? true :bin? true}
                     (:solc project))
-        full-build-path (-> (.getCanonicalPath (clojure.java.io/file "."))
-                            ensure-slash
+        full-build-path (-> (.getCanonicalPath (io/file "."))
+                            fs/ensure-slash
                             (str build-path))
 
-        full-src-path (-> (.getCanonicalPath (clojure.java.io/file "."))
-                          ensure-slash
+        full-src-path (-> (.getCanonicalPath (io/file "."))
+                          fs/ensure-slash
                           (str src-path))
+        ;; TODO : delete on exit
+        temp-src-path (when shim
+                        (.getCanonicalPath (fs/create-temp-dir! src-path)))
 
         contracts-map (cond (sequential? contracts)
                             (reduce (fn [m c]
-                                      (assoc m (str (ensure-slash src-path) c) c))
+                                      (assoc m (str (fs/ensure-slash src-path) c) c))
                                     {}
                                     contracts)
 
@@ -176,11 +184,12 @@
                                                           (string/split #"/")
                                                           last))))
                                     {}
-                                    (walk-dir src-path #".*\.sol" false))
+                                    (fs/walk-dir src-path #".*\.sol" false))
 
                             :else (lein/abort "Unknown `:contracts` option found in project.clj"))
         opts-map (merge opts {:build-path full-build-path
-                              :src-path full-src-path})
+                              :src-path full-src-path
+                              :temp-src-path temp-src-path})
         once (fn [] (cond (sequential? contracts)
                           (doseq [c contracts]
                             (compile-contract (merge opts-map
@@ -190,7 +199,7 @@
                           (doseq [[path c] contracts-map]
                             (compile-contract (merge opts-map
                                                      {:filename (-> path
-                                                                    (string/split (re-pattern (ensure-slash src-path)))
+                                                                    (string/split (re-pattern (fs/ensure-slash src-path)))
                                                                     last)})))))
         auto (fn [] (let [watcher (start-watcher src-path)]
                       (while true
@@ -200,6 +209,7 @@
                                 (compile-contract (merge opts-map
                                                          {:filename (get contracts-map filename)})))
                             (lein/info (format "Ignoring changes in %s" filename)))))))]
+
     (cond
       (not opts)
       (lein/abort "No `:solc` options map found in project.clj")
