@@ -102,6 +102,7 @@
     (let [code (slurp (str (fs/ensure-slash src-path) filename))]
       (cond->> code
         (some #(= :matches %) shim) matches/shim
+        ;; TODO : future shims go here
         ;; after shimming write to temp dir
         true (spit (str (fs/ensure-slash temp-src-path) filename)))))
 
