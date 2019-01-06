@@ -1,12 +1,14 @@
 (ns shim.matches
   (:require
-   [clj-antlr.core :as antlr]
+   ;; [clj-antlr.core :as antlr]
    [clojure.core.match :refer [match]]
-   [clojure.java.io :as io]
+   ;; [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [clojure.walk :as walk]
-   [clojure.zip :as zip])
+   [clojure.zip :as zip]
+   [solidity.parser :as solidity]
+   )
   (:import [org.stringtemplate.v4 ST STGroup STGroupFile]))
 
 ;; spec
@@ -145,16 +147,6 @@
                visitor)
   state)
 
-;; parser
-
-(def parse-solidity (-> (io/resource "grammar/Solidity.g4")
-                        slurp
-                        (antlr/parser)))
-
-(defn parse [code]
-  (let [[_ & statements] (parse-solidity code)]
-    statements))
-
 ;; test
 
 (comment
@@ -276,7 +268,7 @@
   Idempotent : vanilla solidity code is returned as-is."
   [code]
   (if-let [replacement (get-matches-code code)]
-    (let [ast (parse code)
+    (let [ast (solidity/parse code)
           initial-state (atom {:columns []
                                :patterns []
                                :returns []})

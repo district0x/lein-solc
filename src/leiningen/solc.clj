@@ -9,7 +9,8 @@
    [clojure.string :as string]
    [leiningen.core.main :as lein]
    [fs.fs :as fs]
-   [shim.matches :as matches]))
+   [shim.matches :as matches]
+   [shim.conditionals :as conditionals]))
 
 (defn sh! [{:keys [err-only? verbose?] :as opts} & args]
   (when verbose?
@@ -102,7 +103,10 @@
     (let [code (slurp (str (fs/ensure-slash src-path) filename))]
       (cond->> code
         (some #(= :matches %) shim) matches/shim
+        (some #(= :conditionals %) shim) conditionals/shim
+
         ;; TODO : future shims go here
+
         ;; after shimming write to temp dir
         true (spit (str (fs/ensure-slash temp-src-path) filename)))))
 
