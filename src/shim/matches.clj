@@ -1,13 +1,15 @@
 (ns shim.matches
   (:require
    ;; [clojure.future :refer :all]
+   [clj-antlr.core :as antlr]
+   [clojure.core.match :refer [match]]
+   [clojure.java.io :as io]
+   [clojure.spec.alpha :as s]
+   [clojure.string :as string]
    [clojure.walk :as walk]
    [clojure.zip :as zip]
-   [clojure.core.match :refer [match]]
-   [clojure.spec.alpha :as s]
-   [clojure.java.io :as io]
-   [clj-antlr.core :as antlr]
-   #_[shim.dev :refer [ast]]))
+   #_[shim.dev :refer [ast]])
+  (:import [org.stringtemplate.v4 ST STGroup STGroupFile]))
 
 ;; Match m =
 ;;          matches([x, y, z],
@@ -249,3 +251,71 @@
 
   (s/conform ::column-tuple column-tuple)
   )
+
+;;;;;;;;;;;;;;;;;;;
+;;---generator---;;
+;;;;;;;;;;;;;;;;;;;
+
+(defn generate-solidity
+  [{:keys [:columns :patterns :returns]}]
+  (let [keep-indices (fn [coll]
+                       (keep-indexed #(if-not (= wildcard %2) %1)
+                                     coll))
+        filter-by-index (fn [coll idx]
+                          (map (partial nth coll) idx))
+        generate-match (fn [cols patt ret]
+                         (-> (STGroupFile. "templates/solidity.stg")
+                             (.getInstanceOf "match")
+                             (.add "columns" cols)
+                             (.add "pattern" patt)
+                             (.add "return" ret)
+                             (.render)))
+        generate-return (fn [ret]
+                          (-> (STGroupFile. "templates/solidity.stg")
+                              (.getInstanceOf "return")
+                              (.add "return" ret)
+                              (.render)))]
+    (loop [[head & tail] patterns
+           res ""
+           idx 0]
+      (if tail
+        (let [indices (keep-indices head)]
+          (recur tail
+                 (str res (generate-match (filter-by-index columns indices)
+                                          (filter-by-index head indices)
+                                          (nth returns idx)))
+                 (inc idx)))
+        ;; return last
+        (str res (generate-return (nth returns idx)))))))
+
+;;;;;;;;;;;;;;
+;;---test---;;
+;;;;;;;;;;;;;;
+
+(comment
+  (def matches {:columns ["x" "y" "z"],
+                :patterns ['("_" "false" "true") '("false" "true" "_") '("_" "_" "false") '("_" "_" "true")]
+                :returns ["Match.One" "Match.Two" "Match.Three" "Match.Four"]})
+
+  (generate-solidity matches))
+
+;;;;;;;;;;;;;;
+;;---shim---;;
+;;;;;;;;;;;;;;
+
+(defn get-matches-code
+  [code]
+  (first (re-find #"(?is)(matches\()(.*)(\);)" code)))
+
+(defn shim
+  "given a vanilla source code passes it through shim and
+  returns a string with the shimmed source code."
+  [code]
+  (let [ast (parse code)
+        initial-state (atom {:columns []
+                             :patterns []
+                             :returns []})
+        updated-state (visit-tree ast initial-state)
+        shim (generate-solidity @updated-state)
+        replacement (get-matches-code code)]
+    (string/replace code replacement shim)))

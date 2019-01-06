@@ -8,13 +8,8 @@
    [clojure.java.shell :as sh]
    [clojure.string :as string]
    [leiningen.core.main :as lein]
-
    [fs.fs :as fs]
-
-   [shim.matches :as matches]
-   [shim.stringtemplate :as generator]
-   )
- )
+   [shim.matches :as matches]))
 
 (defn sh! [{:keys [err-only? verbose?] :as opts} & args]
   (when verbose?
@@ -96,30 +91,24 @@
              ".bin")
         bin))
 
+(defn compile-contract [{:keys [filename src-path build-path
+                                abi? bin? truffle-artifacts?
+                                solc-err-only verbose byte-count
+                                optimize-runs
+                                temp-src-path shim]
+                         :as opts-map}]
 
+  (when shim
+    (let [code (slurp (str (fs/ensure-slash src-path) filename))]
+      (cond->> code
+        (some #(= :matches %) shim) matches/shim
+        ;; after shimming write to temp dir
+        true (spit (str (fs/ensure-slash temp-src-path) filename)))))
 
-;; TODO : in tmp dir replace code with shim in the source file
-;; TODO : pass shimmed file for compiling
-
-(defn get-code
-  [file]
-  (first (re-find #"(?is)(matches\()(.*)(\);)" (slurp file))))
-
-
-
-(defn compile-contract [{:keys [filename src-path build-path abi? bin? truffle-artifacts? solc-err-only verbose byte-count optimize-runs] :as opts-map}]
-  (let [file-path (str (fs/ensure-slash src-path) filename)
-        code (get-code file-path)
-        ast (-> file-path
-                slurp
-                matches/parse)
-        initial-state (atom {:columns []
-                             :patterns []
-                             :returns []})
-        updated-state (matches/visit-tree ast initial-state)
-        shim (generator/generate-solidity @updated-state)
-        ;; shimmed-code (string/replace (slurp file-path) code shim)
-
+  (let [src-path (if shim
+                   ;; use temp dir if source code is shimmed
+                   temp-src-path
+                   src-path)
         runs (or (cond
                    (integer? optimize-runs)
                    optimize-runs
@@ -127,14 +116,6 @@
                    (map? optimize-runs)
                    (get optimize-runs filename))
                  200)]
-
-    #_(let [temp-file (java.io.File/createTempFile "pre" ".suff")]
-
-      (prn (.getAbsolutePath temp-file))
-
-      (.deleteOnExit temp-file))
-
-    ;; TODO : compile shimmed
 
     (sh/with-sh-dir src-path
       (let [[exit-status output] (sh! {:err-only? solc-err-only :verbose? verbose} "solc"
@@ -156,7 +137,6 @@
                                        (nth (inc position))
                                        (string/split #"\n"))]
                (when-not (empty? bin)
-
                  (fs/safe-create-dir! build-path)
 
                  (when truffle-artifacts?
@@ -183,12 +163,12 @@
                             fs/ensure-slash
                             (str build-path))
 
-        ;; TODO : create tmp dir
-        full-src-path (if false #_shim
-                        #_.getCanonicalPath (fs/create-temp-dir! src-path)
-                        (-> (.getCanonicalPath (io/file "."))
-                                   fs/ensure-slash
-                                   (str src-path)))
+        full-src-path (-> (.getCanonicalPath (io/file "."))
+                          fs/ensure-slash
+                          (str src-path))
+        ;; TODO : delete on exit
+        temp-src-path (when shim
+                        (.getCanonicalPath (fs/create-temp-dir! src-path)))
 
         contracts-map (cond (sequential? contracts)
                             (reduce (fn [m c]
@@ -203,11 +183,12 @@
                                                           (string/split #"/")
                                                           last))))
                                     {}
-                                    (fs/walk-dir full-src-path #".*\.sol" false))
+                                    (fs/walk-dir src-path #".*\.sol" false))
 
                             :else (lein/abort "Unknown `:contracts` option found in project.clj"))
         opts-map (merge opts {:build-path full-build-path
-                              :src-path full-src-path})
+                              :src-path full-src-path
+                              :temp-src-path temp-src-path})
         once (fn [] (cond (sequential? contracts)
                           (doseq [c contracts]
                             (compile-contract (merge opts-map
@@ -227,8 +208,6 @@
                                 (compile-contract (merge opts-map
                                                          {:filename (get contracts-map filename)})))
                             (lein/info (format "Ignoring changes in %s" filename)))))))]
-
-    #_(prn full-src-path)
 
     (cond
       (not opts)

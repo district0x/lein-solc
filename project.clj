@@ -6,6 +6,7 @@
 
   :dependencies [[clj-antlr "0.2.4"]
                  [clojure-future-spec "1.9.0-beta4"]
+                 [me.raynes/fs "1.4.6"]
                  [clojure-watch "0.1.14"]
                  [cheshire "5.8.1"]
                  [org.antlr/ST4 "4.0.8"]

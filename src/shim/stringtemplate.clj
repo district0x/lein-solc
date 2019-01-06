@@ -20,7 +20,7 @@
 ;; return 4;
 
 ;; TODO: indentation
-(defn generate-solidity
+#_(defn generate-solidity
   [{:keys [:columns :patterns :returns]}]
   (let [keep-indices (fn [coll]
                        (keep-indexed #(if-not (= wildcard %2) %1)
@@ -52,7 +52,7 @@
         ;; return last
         (str res (generate-return (nth returns idx)))))))
 
-(comment
+#_(comment
   (def matches {:columns ["x" "y" "z"],
                 :patterns ['("_" "false" "true") '("false" "true" "_") '("_" "_" "false") '("_" "_" "true")]
                 :returns ["Match.One" "Match.Two" "Match.Three" "Match.Four"]})
